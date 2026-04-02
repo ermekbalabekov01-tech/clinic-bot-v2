@@ -12,14 +12,14 @@ function normalizeText(text) {
 
 function isRestartCommand(text) {
   const t = normalizeText(text);
-  return [
-    "привет",
-    "здравствуйте",
-    "заново",
-    "начать заново",
-    "старт",
-    "/start"
-  ].includes(t);
+  return (
+    t === "привет" ||
+    t === "здравствуйте" ||
+    t === "заново" ||
+    t === "начать заново" ||
+    t === "/start" ||
+    t === "старт"
+  );
 }
 
 function parseNameAndAge(text) {
@@ -34,9 +34,7 @@ function parseNameAndAge(text) {
     .replace(/\s+/g, " ")
     .trim();
 
-  if (!name) {
-    name = cleaned;
-  }
+  if (!name) name = cleaned;
 
   return { name, age };
 }
@@ -47,7 +45,11 @@ async function startFlow(phone) {
 
   await sendTextMessage(
     phone,
-    "Здравствуйте! 🌸 Меня зовут Алия.\n\nПодскажите, пожалуйста, из какого вы города?"
+    "Здравствуйте! 🌸\n" +
+      "Меня зовут Алия.\n\n" +
+      "Вы обратились в клинику Dr.Aitimbetova.\n" +
+      "С радостью помогу Вам с подбором процедуры и записью.\n\n" +
+      "Подскажите, пожалуйста, из какого Вы города?"
   );
 }
 
@@ -66,10 +68,7 @@ async function verifyWebhook(req, res) {
 async function handleWebhook(req, res) {
   try {
     const message = req.body?.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
-
-    if (!message) {
-      return res.sendStatus(200);
-    }
+    if (!message) return res.sendStatus(200);
 
     const phone = message.from;
     const text =
@@ -80,16 +79,16 @@ async function handleWebhook(req, res) {
     console.log("PHONE:", phone);
     console.log("TEXT:", text);
 
-    // 1. Любая команда перезапуска ловится СРАЗУ, до чтения step
+    // Всегда первым делом ловим команду перезапуска
     if (isRestartCommand(text)) {
+      console.log("RESTART_TRIGGERED");
       await startFlow(phone);
       return res.sendStatus(200);
     }
 
-    // 2. Получаем сессию
-    let session = await getSession(phone);
+    const session = await getSession(phone);
 
-    // 3. Если сессии нет — стартуем
+    // Если сессии нет, просто мягко запускаем сценарий заново
     if (!session) {
       await startFlow(phone);
       return res.sendStatus(200);
@@ -98,11 +97,10 @@ async function handleWebhook(req, res) {
     let payload = {};
     try {
       payload = session.payload_json ? JSON.parse(session.payload_json) : {};
-    } catch (e) {
+    } catch {
       payload = {};
     }
 
-    // 4. Шаг: город
     if (session.step === "ask_city") {
       await setSession(phone, "ask_name_age", {
         ...payload,
@@ -111,13 +109,14 @@ async function handleWebhook(req, res) {
 
       await sendTextMessage(
         phone,
-        "Благодарю 🌿\n\nПодскажите, пожалуйста, как я могу к вам обращаться и ваш возраст?"
+        "Благодарю 🌿\n\n" +
+          "Подскажите, пожалуйста, как я могу к Вам обращаться и Ваш возраст?\n\n" +
+          "Например: Ермек 36 лет"
       );
 
       return res.sendStatus(200);
     }
 
-    // 5. Шаг: имя и возраст
     if (session.step === "ask_name_age") {
       const { name, age } = parseNameAndAge(text);
 
@@ -131,7 +130,8 @@ async function handleWebhook(req, res) {
       if (!client || !client.id) {
         await sendTextMessage(
           phone,
-          "Произошла техническая ошибка. Пожалуйста, напишите: Привет"
+          "Произошла техническая ошибка.\n" +
+            "Пожалуйста, напишите ещё раз: Привет"
         );
         return res.sendStatus(200);
       }
@@ -144,30 +144,20 @@ async function handleWebhook(req, res) {
         status: "new",
       });
 
-      await setSession(phone, "done", {
-        ...payload,
-        name,
-        age,
-      });
+      // Убираем сессию, чтобы не было цикла
+      await clearSession(phone);
 
       await sendTextMessage(
         phone,
-        `Спасибо, ${name}! 😊\n\nВы можете прийти на бесплатную консультацию.\n\nЧтобы начать новую заявку, просто напишите: Привет`
+        `Спасибо, ${name}! 😊\n\n` +
+          "Вы можете прийти на бесплатную консультацию, где специалист подробно всё посмотрит и подберёт подходящее решение.\n\n" +
+          "Если захотите оформить новую заявку или начать заново, просто напишите: Привет"
       );
 
       return res.sendStatus(200);
     }
 
-    // 6. Если шаг done — не спорим, а мягко перезапускаем по любой новой реплике
-    if (session.step === "done") {
-      await sendTextMessage(
-        phone,
-        "Чтобы начать новую заявку, напишите: Привет"
-      );
-      return res.sendStatus(200);
-    }
-
-    // 7. Фоллбек
+    // Если шаг непонятный — спокойно начинаем сначала
     await startFlow(phone);
     return res.sendStatus(200);
 
