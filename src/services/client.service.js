@@ -20,7 +20,6 @@ async function upsertClient({ phone, name = null, age = null, city = null }) {
       `,
       [phone, name, age, city]
     );
-
     return updated.rows[0];
   }
 

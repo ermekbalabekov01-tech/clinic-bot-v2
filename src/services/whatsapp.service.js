@@ -1,31 +1,57 @@
-const axios = require("axios");
+CREATE TABLE IF NOT EXISTS clients (
+  id SERIAL PRIMARY KEY,
+  phone VARCHAR(30) UNIQUE NOT NULL,
+  name VARCHAR(100),
+  age INTEGER,
+  city VARCHAR(100),
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
 
-const WHATSAPP_API = "https://graph.facebook.com/v18.0";
+CREATE TABLE IF NOT EXISTS sessions (
+  id SERIAL PRIMARY KEY,
+  phone VARCHAR(30) UNIQUE NOT NULL,
+  step VARCHAR(50) NOT NULL,
+  payload_json TEXT,
+  updated_at TIMESTAMP DEFAULT NOW()
+);
 
-async function sendTextMessage(to, text) {
-  const url = `${WHATSAPP_API}/${process.env.PHONE_NUMBER_ID}/messages`;
+CREATE TABLE IF NOT EXISTS leads (
+  id SERIAL PRIMARY KEY,
+  client_id INTEGER REFERENCES clients(id) ON DELETE CASCADE,
+  service_key VARCHAR(50),
+  service_title VARCHAR(255),
+  city VARCHAR(100),
+  photo_needed BOOLEAN DEFAULT FALSE,
+  photo_received BOOLEAN DEFAULT FALSE,
+  photo_media_id TEXT,
+  preferred_date DATE,
+  preferred_time VARCHAR(10),
+  status VARCHAR(50) DEFAULT 'new',
+  source VARCHAR(50) DEFAULT 'whatsapp',
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
 
-  const response = await axios.post(
-    url,
-    {
-      messaging_product: "whatsapp",
-      to,
-      type: "text",
-      text: {
-        body: text,
-      },
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.ACCESS_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-    }
-  );
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS name VARCHAR(100);
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS age INTEGER;
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS city VARCHAR(100);
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();
 
-  return response.data;
-}
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS step VARCHAR(50);
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS payload_json TEXT;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();
 
-module.exports = {
-  sendTextMessage,
-};
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS client_id INTEGER;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS service_key VARCHAR(50);
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS service_title VARCHAR(255);
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS city VARCHAR(100);
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS photo_needed BOOLEAN DEFAULT FALSE;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS photo_received BOOLEAN DEFAULT FALSE;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS photo_media_id TEXT;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS preferred_date DATE;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS preferred_time VARCHAR(10);
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'new';
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS source VARCHAR(50) DEFAULT 'whatsapp';
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();
