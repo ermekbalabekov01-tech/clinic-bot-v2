@@ -3,7 +3,7 @@ const router = express.Router();
 const {
   verifyWebhook,
   handleWebhook,
-} = require("../controllers/whatsapp.controller");
+} = require("./controllers/whatsapp.controller");
 
 router.get("/webhook", verifyWebhook);
 router.post("/webhook", handleWebhook);
